@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.api.routes import health
+from app.api.routes import health, status
 
 app = FastAPI(
     title=settings.PROJECT_NAME,  # Change
@@ -20,6 +20,8 @@ app.add_middleware(
 
 # Include the health check router
 app.include_router(health.router)
+# Add the new status router
+app.include_router(status.router, prefix=settings.API_V1_STR)
 
 
 @app.get("/")
