@@ -1,6 +1,8 @@
 from datetime import datetime
 from typing import Optional, List, TYPE_CHECKING
+from sqlalchemy import Index
 from sqlmodel import Field, SQLModel, Relationship
+from pydantic import field_validator
 
 # Import the link model
 from .bookmark_tag import BookmarkTag
@@ -18,12 +20,24 @@ class BookmarkBase(SQLModel):
     title: str = Field(max_length=200)
     description: Optional[str] = Field(default=None, max_length=1000)
     is_favorite: bool = Field(default=False)
+    views_count: int = Field(default=0)
+
+    @field_validator("url")
+    @classmethod
+    def validate_url_format(cls, v):
+        if not v.startswith(("http://", "https://")):
+            raise ValueError("URL must start with http:// or https://")
+        return v
 
 
 class Bookmark(BookmarkBase, table=True):
     """Database model for bookmarks"""
 
     __tablename__ = "bookmarks"
+
+    __table_args__ = (
+        Index("ix_bookmarks_user_id_created_at", "user_id", "created_at"),
+    )
 
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id", index=True)

@@ -1,5 +1,7 @@
+import pytest
+from pydantic import ValidationError
 from sqlmodel import Session
-from app.models import User, Bookmark, Tag, BookmarkTag
+from app.models import User, Bookmark, Tag, BookmarkTag, BookmarkCreate
 
 
 def test_create_user(session: Session):
@@ -75,3 +77,35 @@ def test_create_bookmark_with_tags(session: Session):
     assert len(bookmark.tags) == 2
     assert bookmark.tags[0].name == "python"
     assert bookmark.tags[1].name == "fastapi"
+
+
+def test_views_count_default(session: Session):
+    """Test that a new bookmark has a default views_count of 0."""
+    user = User(username="testuser", email="test@example.com", hashed_password="hash")
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+
+    bookmark = Bookmark(url="https://example.com", title="Test", user_id=user.id)
+    session.add(bookmark)
+    session.commit()
+    session.refresh(bookmark)
+
+    assert bookmark.views_count == 0
+
+
+def test_url_validator_success():
+    """Test that a valid URL passes Pydantic validation."""
+    # This doesn't need the database, it just tests the schema
+    data = {"url": "https://goodurl.com", "title": "Good"}
+    bookmark = BookmarkCreate(**data)
+    assert bookmark.url == "https://goodurl.com"
+
+
+def test_url_validator_failure():
+    """Test that an invalid URL correctly raises a validation error."""
+    with pytest.raises(ValidationError) as excinfo:
+        BookmarkCreate(url="ftp://badurl.com", title="Bad")
+
+    # Check that the error message is what we expect
+    assert "URL must start with http:// or https://" in str(excinfo.value)
