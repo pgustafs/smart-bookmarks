@@ -1,7 +1,19 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.api.routes import health, status
+from app.core.database import init_db, get_session
+from app.api.routes import api_router  # Import the master router
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    print("App startup...")
+    if get_session not in app.dependency_overrides:
+        init_db()
+    yield
+    print("App shutdown...")
+
 
 app = FastAPI(
     title=settings.PROJECT_NAME,  # Change
@@ -18,10 +30,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include the health check router
-app.include_router(health.router)
-# Add the new status router
-app.include_router(status.router, prefix=settings.API_V1_STR)
+# Include the master API router with the global prefix
+app.include_router(api_router, prefix=settings.API_V1_STR)
 
 
 @app.get("/")

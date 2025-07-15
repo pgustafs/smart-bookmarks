@@ -19,7 +19,7 @@ def mask_db_url(url: str) -> str:
     return re.sub(r"://(.*?):(.*?)@", r"://********:********@", url)
 
 
-@router.get("/status", response_model=StatusResponse)
+@router.get("/", response_model=StatusResponse)
 async def get_status():
     """
     Returns the current server time and a masked database URL for status checks.
