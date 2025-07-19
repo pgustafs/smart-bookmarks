@@ -2,16 +2,30 @@ from typing import List, Optional
 from fastapi import APIRouter, HTTPException, status, Query
 from sqlmodel import select, func, or_
 from app.api.deps import SessionDep, CurrentUser
+from enum import Enum
+import csv
+import io
+from fastapi.responses import StreamingResponse
 from app.models import (
     Bookmark,
     BookmarkCreate,
     BookmarkRead,
     BookmarkUpdate,
+    BookmarkBulkDelete,
     Tag,
     BookmarkTag,
 )
 
 router = APIRouter()
+
+
+class BookmarkSortField(str, Enum):
+    """Fields to sort bookmarks by."""
+
+    CREATED_AT = "created_at"
+    UPDATED_AT = "updated_at"
+    TITLE = "title"
+    IS_FAVORITE = "is_favorite"
 
 
 @router.post("/", response_model=BookmarkRead, status_code=status.HTTP_201_CREATED)
@@ -62,6 +76,12 @@ def read_bookmarks(
     search: Optional[str] = Query(None, description="Search in title and description"),
     tag: Optional[str] = Query(None, description="Filter by tag"),
     is_favorite: Optional[bool] = Query(None, description="Filter favorites only"),
+    sort_by: BookmarkSortField = Query(
+        BookmarkSortField.CREATED_AT, description="Field to sort by"
+    ),
+    sort_order: str = Query(
+        "desc", description="Sort order (asc or desc)", pattern="^(asc|desc)$"
+    ),
 ):
     """Get user's bookmarks with optional filtering"""
     # Base query
@@ -83,6 +103,12 @@ def read_bookmarks(
         # Join with tags
         query = query.join(BookmarkTag).join(Tag).where(Tag.name == tag.lower())
 
+    sort_column = getattr(Bookmark, sort_by.value)
+    if sort_order == "desc":
+        query = query.order_by(sort_column.desc())
+    else:
+        query = query.order_by(sort_column.asc())
+
     # Execute query
     bookmarks = db.exec(
         query.order_by(Bookmark.created_at.desc()).offset(skip).limit(limit)
@@ -96,6 +122,28 @@ def read_bookmarks(
         result.append(BookmarkRead(**bookmark_dict))
 
     return result
+
+
+@router.post("/bulk-delete", status_code=status.HTTP_204_NO_CONTENT)
+def bulk_delete_bookmarks(
+    delete_in: BookmarkBulkDelete, db: SessionDep, current_user: CurrentUser
+):
+    """Delete multiple bookmarks at once."""
+    # Query for all bookmarks that match the provided IDs AND belong to the current user
+    bookmarks_to_delete = db.exec(
+        select(Bookmark).where(
+            Bookmark.id.in_(delete_in.bookmark_ids), Bookmark.user_id == current_user.id
+        )
+    ).all()
+
+    if not bookmarks_to_delete:
+        # You can choose to raise an error or just do nothing
+        return
+
+    for bookmark in bookmarks_to_delete:
+        db.delete(bookmark)
+
+    db.commit()
 
 
 @router.get("/stats")
@@ -235,3 +283,46 @@ def delete_bookmark(bookmark_id: int, db: SessionDep, current_user: CurrentUser)
 
     db.delete(bookmark)
     db.commit()
+
+
+@router.get("/export/csv", response_class=StreamingResponse)
+def export_bookmarks_csv(db: SessionDep, current_user: CurrentUser):
+    """Export the user's bookmarks to a CSV file."""
+    # Fetch all bookmarks for the user
+    bookmarks = db.exec(
+        select(Bookmark).where(Bookmark.user_id == current_user.id)
+    ).all()
+
+    # Use an in-memory text buffer
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # Write the header row
+    header = ["id", "url", "title", "description", "is_favorite", "created_at", "tags"]
+    writer.writerow(header)
+
+    # Write data rows
+    for bookmark in bookmarks:
+        # Join tags into a single string
+        tag_str = ", ".join([tag.name for tag in bookmark.tags])
+        row = [
+            bookmark.id,
+            bookmark.url,
+            bookmark.title,
+            bookmark.description,
+            bookmark.is_favorite,
+            bookmark.created_at.isoformat(),
+            tag_str,
+        ]
+        writer.writerow(row)
+
+    # The browser needs these headers to trigger a download
+    headers = {
+        "Content-Disposition": "attachment; filename=bookmarks_export.csv",
+        "Content-Type": "text/csv",
+    }
+
+    # Move the buffer's cursor to the beginning
+    output.seek(0)
+
+    return StreamingResponse(output, headers=headers)

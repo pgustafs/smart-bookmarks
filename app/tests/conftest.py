@@ -56,3 +56,14 @@ def user_fixture(session: Session) -> User:
     session.commit()
     session.refresh(user)
     return user
+
+
+@pytest.fixture(name="auth_headers")
+def auth_headers_fixture(test_user: User) -> dict:
+    """
+    Returns a simple, non-validated Authorization header.
+    This works with the Chapter 3 placeholder dependency.
+    """
+    # The 'test_user' fixture is included to ensure the user exists in the DB,
+    # as the placeholder dependency will try to fetch it.
+    return {"Authorization": "Bearer test"}

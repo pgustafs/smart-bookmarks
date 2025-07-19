@@ -8,8 +8,13 @@ from .bookmark_tag import BookmarkTag
 
 # Import the models that have relationships
 from .tag import Tag, TagRead
-from .bookmark import Bookmark, BookmarkCreate, BookmarkRead, BookmarkUpdate
-
+from .bookmark import (
+    Bookmark,
+    BookmarkCreate,
+    BookmarkRead,
+    BookmarkUpdate,
+    BookmarkBulkDelete,
+)
 
 # This ensures all models are available when importing from app.models
 __all__ = [
@@ -24,4 +29,5 @@ __all__ = [
     "Tag",
     "TagRead",
     "BookmarkTag",
+    "BookmarkBulkDelete",
 ]

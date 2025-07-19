@@ -78,3 +78,9 @@ class BookmarkUpdate(SQLModel):
     description: Optional[str] = Field(None, max_length=1000)
     is_favorite: Optional[bool] = None
     tags: Optional[List[str]] = Field(None, max_items=10)
+
+
+class BookmarkBulkDelete(SQLModel):
+    """Schema for bulk deleting bookmarks."""
+
+    bookmark_ids: List[int]
