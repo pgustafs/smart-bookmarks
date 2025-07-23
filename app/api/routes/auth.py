@@ -136,7 +136,7 @@ def login(
         extra={
             "extra_info": {
                 "event": "LOGIN_SUCCESS",
-                "user_id": user.idi,
+                "user_id": user.id,
                 "request_id": getattr(request.state, "request_id", None),
             }
         },
