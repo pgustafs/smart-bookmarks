@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session, create_engine, SQLModel
 from sqlmodel.pool import StaticPool
 
-# ✅ Import the global 'app' instance from your main application
+# Import the global 'app' instance from your main application
 from app.main import app
 from app.core.database import get_session
 from app.models import User
@@ -59,11 +59,11 @@ def user_fixture(session: Session) -> User:
 
 
 @pytest.fixture(name="auth_headers")
-def auth_headers_fixture(test_user: User) -> dict:
+def auth_headers_fixture(client: TestClient, test_user: User) -> dict:
     """
-    Returns a simple, non-validated Authorization header.
-    This works with the Chapter 3 placeholder dependency.
+    Perform a real login to get a valid JWT token.
     """
-    # The 'test_user' fixture is included to ensure the user exists in the DB,
-    # as the placeholder dependency will try to fetch it.
-    return {"Authorization": "Bearer test"}
+    login_data = {"username": "testuser", "password": "testpass123"}
+    response = client.post("/api/v1/auth/login", json=login_data)
+    token = response.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}

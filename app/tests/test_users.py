@@ -19,9 +19,9 @@ def test_create_user(client: TestClient):
     assert "hashed_password" not in data
 
 
-def test_read_user_me(client: TestClient, test_user: User):
+def test_read_user_me(client: TestClient, test_user: User, auth_headers: dict):
     """Test fetching the current user, which is mocked to be test_user."""
-    response = client.get("/api/v1/users/me", headers={"Authorization": "Bearer test"})
+    response = client.get("/api/v1/users/me", headers=auth_headers)
     assert response.status_code == 200
     data = response.json()
     assert data["username"] == test_user.username
@@ -42,12 +42,12 @@ def test_list_users(client: TestClient, session: Session, test_user: User):
     assert data[1]["username"] == user2.username
 
 
-def test_update_user(client: TestClient, test_user: User):
+def test_update_user(client: TestClient, test_user: User, auth_headers: dict):
     """Test updating the current user's profile."""
     new_full_name = "Updated Test User"
     response = client.patch(
         f"/api/v1/users/{test_user.id}",
-        headers={"Authorization": "Bearer test"},
+        headers=auth_headers,
         json={"full_name": new_full_name},
     )
     assert response.status_code == 200
@@ -56,11 +56,11 @@ def test_update_user(client: TestClient, test_user: User):
     assert data["username"] == test_user.username
 
 
-def test_delete_user(client: TestClient, session: Session, test_user: User):
+def test_delete_user(
+    client: TestClient, session: Session, test_user: User, auth_headers: dict
+):
     """Test deleting the current user's profile."""
-    response = client.delete(
-        f"/api/v1/users/{test_user.id}", headers={"Authorization": "Bearer test"}
-    )
+    response = client.delete(f"/api/v1/users/{test_user.id}", headers=auth_headers)
     assert response.status_code == 204
 
     # Verify the user is actually gone from the database

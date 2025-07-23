@@ -3,7 +3,9 @@ from sqlmodel import Session
 from app.models import User, Bookmark, Tag
 
 
-def test_read_user_tags(client: TestClient, session: Session, test_user: User):
+def test_read_user_tags(
+    client: TestClient, session: Session, test_user: User, auth_headers: dict
+):
     """Test reading tags for the current user, ensuring it's scoped correctly."""
     # Arrange: Create data for two different users
     other_user = User(username="other", email="other@example.com", hashed_password="pw")
@@ -28,7 +30,7 @@ def test_read_user_tags(client: TestClient, session: Session, test_user: User):
     session.commit()
 
     # Act: Fetch tags for 'test_user'
-    response = client.get("/api/v1/tags/", headers={"Authorization": "Bearer test"})
+    response = client.get("/api/v1/tags/", headers=auth_headers)
 
     # Assert
     assert response.status_code == 200
