@@ -14,6 +14,8 @@ class LoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         # Generate a unique request ID
         request_id = str(uuid.uuid4())
+        # Make the request ID available to endpoints
+        request.state.request_id = request_id
 
         # Log request details
         start_time = time.time()

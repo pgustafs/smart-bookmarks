@@ -105,7 +105,11 @@ def login(
             "Failed login attempt for username: %s",
             form_data.username,
             extra={
-                "extra_info": {"event": "LOGIN_FAILURE", "username": form_data.username}
+                "extra_info": {
+                    "event": "LOGIN_FAILURE",
+                    "username": form_data.username,
+                    "request_id": getattr(request.state, "request_id", None),
+                }
             },
         )
 
@@ -129,7 +133,13 @@ def login(
     logger.info(
         "User logged in successfully: %s",
         user.username,
-        extra={"extra_info": {"event": "LOGIN_SUCCESS", "user_id": user.id}},
+        extra={
+            "extra_info": {
+                "event": "LOGIN_SUCCESS",
+                "user_id": user.idi,
+                "request_id": getattr(request.state, "request_id", None),
+            }
+        },
     )
 
     return Token(access_token=access_token, token_type="bearer")

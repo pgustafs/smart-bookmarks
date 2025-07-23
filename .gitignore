@@ -15,5 +15,5 @@ __pycache__/
 # SQLite Databse
 *.db
 
-# Log files
-*.log
+# Application logs
+logs/
