@@ -3,16 +3,29 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.database import init_db, get_session
-from app.api.routes import api_router  # Import the master router
+import logging.config
+from app.core.logging_config import LOGGING_CONFIG
+from app.middleware.logging import LoggingMiddleware
+from app.api.routes import api_router
+
+logging.config.dictConfig(LOGGING_CONFIG)
+logger = logging.getLogger("app")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("App startup...")
+    """
+    Handles startup and shutdown events.
+    """
+    logger.info("--- App startup ---")
+
+    # Initialize the database if not in a test environment
     if get_session not in app.dependency_overrides:
         init_db()
+
     yield
-    print("App shutdown...")
+
+    logger.info("--- App shutdown ---")
 
 
 app = FastAPI(
@@ -21,6 +34,8 @@ app = FastAPI(
     version=settings.VERSION,
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
 )
+
+app.add_middleware(LoggingMiddleware)
 
 app.add_middleware(
     CORSMiddleware,

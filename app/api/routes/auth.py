@@ -18,6 +18,10 @@ from app.core.rate_limit import login_limiter
 from app.api.deps import SessionDep, CurrentUser
 from app.models import User, UserRead
 from app.schemas.auth import Token, LoginRequest, RegisterRequest
+import logging
+
+# Get a logger for this specific module
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -96,6 +100,15 @@ def login(
 
     if not user or not verify_password(form_data.password, user.hashed_password):
         login_limiter.add_attempt(client_ip)
+
+        logger.warning(
+            "Failed login attempt for username: %s",
+            form_data.username,
+            extra={
+                "extra_info": {"event": "LOGIN_FAILURE", "username": form_data.username}
+            },
+        )
+
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
@@ -112,6 +125,13 @@ def login(
         subject=user.username,
         expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
     )
+
+    logger.info(
+        "User logged in successfully: %s",
+        user.username,
+        extra={"extra_info": {"event": "LOGIN_SUCCESS", "user_id": user.id}},
+    )
+
     return Token(access_token=access_token, token_type="bearer")
 
 
