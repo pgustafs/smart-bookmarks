@@ -13,13 +13,15 @@ if TYPE_CHECKING:
     from .user import User
     from .tag import Tag
 
+
 class ProcessingStatus(str, Enum):
     """Status of AI content processing."""
+
     PENDING = "pending"
     PROCESSING = "processing"
     COMPLETED = "completed"
     FAILED = "failed"
-    SKIPPED = "skipped" # Default for non-AI bookmarks
+    SKIPPED = "skipped"  # Default for non-AI bookmarks
 
 
 class BookmarkBase(SQLModel):
@@ -55,7 +57,7 @@ class Bookmark(BookmarkBase, table=True):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     ai_status: ProcessingStatus = Field(
         default=ProcessingStatus.SKIPPED,
-        sa_column=Column(SQLModelEnum(ProcessingStatus))
+        sa_column=Column(SQLModelEnum(ProcessingStatus)),
     )
     ai_error: Optional[str] = Field(default=None, max_length=500)
 

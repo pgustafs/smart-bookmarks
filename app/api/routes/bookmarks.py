@@ -39,14 +39,16 @@ def create_bookmark(
     bookmark_in: BookmarkCreate,
     db: SessionDep,
     current_user: CurrentUser,
-    request: Request
+    request: Request,
 ):
     """Create a new bookmark with optional AI enhancement"""
     # Create the initial bookmark object
     bookmark = Bookmark(
         **bookmark_in.model_dump(exclude={"tags"}),
         user_id=current_user.id,
-        ai_status=ProcessingStatus.PENDING if bookmark_in.ai_enabled else ProcessingStatus.SKIPPED
+        ai_status=ProcessingStatus.PENDING
+        if bookmark_in.ai_enabled
+        else ProcessingStatus.SKIPPED,
     )
     db.add(bookmark)
     db.commit()
@@ -61,11 +63,11 @@ def create_bookmark(
                 db.add(tag)
                 db.commit()
                 db.refresh(tag)
-            
+
             # Manually create the link table entry
             bookmark_tag = BookmarkTag(bookmark_id=bookmark.id, tag_id=tag.id)
             db.add(bookmark_tag)
-        
+
         db.commit()
         db.refresh(bookmark)
 
@@ -77,27 +79,29 @@ def create_bookmark(
         "request_id": getattr(request.state, "request_id", None),
     }
     logger.info("Bookmark created", extra={"extra_info": log_context})
-    
+
     # Queue AI processing if enabled
     if bookmark.ai_enabled:
         try:
             process_bookmark_content.delay(
                 bookmark_id=bookmark.id,
                 user_id=current_user.id,
-                request_id=getattr(request.state, "request_id", None)
+                request_id=getattr(request.state, "request_id", None),
             )
         except Exception as e:
-            logger.error(f"Failed to queue AI processing for bookmark {bookmark.id}: {e}")
+            logger.error(
+                f"Failed to queue AI processing for bookmark {bookmark.id}: {e}"
+            )
             bookmark.ai_status = ProcessingStatus.FAILED
             bookmark.ai_error = "Failed to queue processing task."
             db.add(bookmark)
             db.commit()
             db.refresh(bookmark)
-    
+
     # Manually construct the response model
     return BookmarkRead(
-        **bookmark.model_dump(exclude={"tags", "tags_from_relationship"}), 
-        tags=[tag.name for tag in bookmark.tags]
+        **bookmark.model_dump(exclude={"tags", "tags_from_relationship"}),
+        tags=[tag.name for tag in bookmark.tags],
     )
 
 
