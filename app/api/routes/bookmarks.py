@@ -1,5 +1,5 @@
 from typing import List, Optional
-from fastapi import APIRouter, HTTPException, status, Query
+from fastapi import APIRouter, HTTPException, status, Query, Request
 from sqlmodel import select, func, or_
 from app.api.deps import SessionDep, CurrentUser
 from enum import Enum
@@ -14,7 +14,13 @@ from app.models import (
     BookmarkBulkDelete,
     Tag,
     BookmarkTag,
+    ProcessingStatus,
 )
+from app.tasks.ai_tasks import process_bookmark_content
+import logging
+
+# Add a logger
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -30,40 +36,68 @@ class BookmarkSortField(str, Enum):
 
 @router.post("/", response_model=BookmarkRead, status_code=status.HTTP_201_CREATED)
 def create_bookmark(
-    bookmark_in: BookmarkCreate, db: SessionDep, current_user: CurrentUser
+    bookmark_in: BookmarkCreate,
+    db: SessionDep,
+    current_user: CurrentUser,
+    request: Request
 ):
-    """Create a new bookmark"""
-    # Create bookmark
+    """Create a new bookmark with optional AI enhancement"""
+    # Create the initial bookmark object
     bookmark = Bookmark(
-        **bookmark_in.model_dump(exclude={"tags"}), user_id=current_user.id
+        **bookmark_in.model_dump(exclude={"tags"}),
+        user_id=current_user.id,
+        ai_status=ProcessingStatus.PENDING if bookmark_in.ai_enabled else ProcessingStatus.SKIPPED
     )
     db.add(bookmark)
     db.commit()
     db.refresh(bookmark)
 
-    # Handle tags
-    if bookmark_in.tags:
-        for tag_name in bookmark_in.tags:
-            # Get or create tag
+    # If AI is NOT enabled, use the explicit, manual tag handling logic
+    if not bookmark.ai_enabled and bookmark_in.tags:
+        for tag_name in set(bookmark_in.tags):
             tag = db.exec(select(Tag).where(Tag.name == tag_name.lower())).first()
             if not tag:
                 tag = Tag(name=tag_name.lower())
                 db.add(tag)
                 db.commit()
                 db.refresh(tag)
-
-            # Create bookmark-tag relationship
+            
+            # Manually create the link table entry
             bookmark_tag = BookmarkTag(bookmark_id=bookmark.id, tag_id=tag.id)
             db.add(bookmark_tag)
-
+        
         db.commit()
-        # Refresh the bookmark again to load the new tag relationships
         db.refresh(bookmark)
 
-    # Exclude the 'tags' relationship from the model_dump
+    # Log the creation event
+    log_context = {
+        "event": "CREATE_BOOKMARK",
+        "bookmark_id": bookmark.id,
+        "user_id": current_user.id,
+        "request_id": getattr(request.state, "request_id", None),
+    }
+    logger.info("Bookmark created", extra={"extra_info": log_context})
+    
+    # Queue AI processing if enabled
+    if bookmark.ai_enabled:
+        try:
+            process_bookmark_content.delay(
+                bookmark_id=bookmark.id,
+                user_id=current_user.id,
+                request_id=getattr(request.state, "request_id", None)
+            )
+        except Exception as e:
+            logger.error(f"Failed to queue AI processing for bookmark {bookmark.id}: {e}")
+            bookmark.ai_status = ProcessingStatus.FAILED
+            bookmark.ai_error = "Failed to queue processing task."
+            db.add(bookmark)
+            db.commit()
+            db.refresh(bookmark)
+    
+    # Manually construct the response model
     return BookmarkRead(
-        **bookmark.model_dump(exclude={"tags"}),
-        tags=[tag.name for tag in bookmark.tags],
+        **bookmark.model_dump(exclude={"tags", "tags_from_relationship"}), 
+        tags=[tag.name for tag in bookmark.tags]
     )
 
 

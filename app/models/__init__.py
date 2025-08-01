@@ -14,6 +14,7 @@ from .bookmark import (
     BookmarkRead,
     BookmarkUpdate,
     BookmarkBulkDelete,
+    ProcessingStatus,
 )
 
 # This ensures all models are available when importing from app.models
@@ -30,4 +31,5 @@ __all__ = [
     "TagRead",
     "BookmarkTag",
     "BookmarkBulkDelete",
+    "ProcessingStatus",
 ]

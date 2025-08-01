@@ -19,6 +19,12 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     LOG_ROTATION_SIZE_MB: int = 5
     LOG_ROTATION_BACKUP_COUNT: int = 3
+    # Add Redis and AI Configuration
+    REDIS_URL: str = "redis://localhost:6379/0"
+    AI_ENABLED: bool = True
+    AI_API_BASE_URL: str = "http://localhost:8080/v1"
+    AI_API_KEY: Optional[str] = "secret_key"
+    AI_MODEL: str = "qwen3"
 
 
 settings = Settings()
